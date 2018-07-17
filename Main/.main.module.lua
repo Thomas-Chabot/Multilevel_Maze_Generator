@@ -76,6 +76,8 @@ function G.generate (numRows, numColumns, options)
 	}, Grid);
 	
 	grid:_generateFloors (options);
+	assert (grid._numFloors >= 1, "Could not generate a valid grid.");
+	
 	return grid;
 end
 
@@ -89,15 +91,41 @@ end
 
 -- Generator
 function Grid:_generateFloors (options)
-	for floor = 1,self._numFloors do
+	local _generate = function (floor, isRoof)
+		options.isRoof = isRoof;
 		local grid = self:_generateFloor (floor, options)
+		
+		-- Possible error case: Couldn't generate a valid grid
+		if (not grid) then
+			self._numFloors = floor - 1;
+			return false;
+		end
+		
 		self._floors [floor] = grid;
 		
 		self:_setPreviousFloor (options, grid);
+		return true;
 	end
+	
+	for floor = 1,self._numFloors do
+		if (not _generate (floor, false)) then
+			break;
+		end
+	end
+	
+	local result = _generate (self._numFloors + 1, true);
+	print ("Generator completed with ", self._numFloors, " floors")
 end
 function Grid:_generateFloor (floorNum, options)
-	return Generator.generate (self._numRows, self._numColumns, options);
+	local grid;
+	
+	-- Try to generate the grid
+	-- If it throws an error, just return nil
+	pcall (function ()
+		grid = Generator.generate (self._numRows, self._numColumns, options);
+	end)
+	
+	return grid;
 end
 function Grid:_setPreviousFloor (optionsDict, previousFloor)
 	optionsDict.IsBottomFloor = false;
@@ -116,6 +144,9 @@ function Grid:_build (settings)
 		-- Build the next floor on top
 		settings.Offset = settings.Offset + Vector3.new (0, settings.SpaceSize.Y, 0);
 	end
+	
+	settings.isRoof = true;
+	Builder.build (self._floors [self._numFloors + 1], settings);
 end
 
 -- ** Metamethods ** --

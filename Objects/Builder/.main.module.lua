@@ -61,19 +61,20 @@ local fixExitRotation = require (script.WedgeRotation);
 
 
 -- ** Global Functions ** --
-function reposition (object, position, offset)
-	if (not offset) then offset = Vector3.new (0, 0, 0) end
-	
-	-- Try to get a part
-	local pPart = object;
-	if (object:IsA("Model")) then pPart = object.PrimaryPart; end
-	
-	-- If we have one => Can set part's CFrame
-	-- Otherwise, just use :MoveTo() of the model
-	if (pPart) then
-		pPart.CFrame = CFrame.new (position) + offset;
+function reposition (object, position)
+	if (object:IsA("BasePart")) then
+		object.CFrame = CFrame.new (position)
 	else
-		object:MoveTo (position + offset);
+		local primaryPart = object.PrimaryPart;
+		local primaryPos  = primaryPart.Position;
+		local positionChange = position - primaryPos;
+		
+		for _,part in pairs (object:GetDescendants()) do
+			if (part:IsA("BasePart")) then
+				local partOffset = part.Position - primaryPos;
+				part.CFrame = CFrame.new (primaryPos + positionChange + partOffset);
+			end
+		end
 	end
 end
 
@@ -96,6 +97,7 @@ end
 -- ** Static Functions ** --
 local parts = script.Parts;
 local floor = parts.Floor;
+local detectorScript = script.DetectorScript;
 local wall  = parts.Wall;
 local mazeSpawn = parts.Spawn;
 local exitWedge = parts.ExitWedge;
@@ -111,6 +113,16 @@ function B._floor (settings)
 	-- Resize the floor - should be only Y = 1 (allowing players to walk on it)
 	newFloor.Size = Vector3.new (newFloor.Size.X, 1, newFloor.Size.Z);
 	return newFloor;
+end
+function B._floorDetector (settings)
+	local floor = B._floor (settings);
+
+	floor.Name = "FloorDetector";
+	floor.CanCollide = false;
+	floor.Transparency = 1;
+	
+	detectorScript:Clone ().Parent = floor;
+	return floor;
 end
 function B._spawn (settings)
 	-- Note - Special case - If it's not the bottom floor, just put in a floor
@@ -150,7 +162,7 @@ function B._deadend (floor, settings)
 
 	-- Set the floor as the primary part - this is what we want to position
 	--  in the builder
-	mainModel.Parent = newFloor;
+	mainModel.PrimaryPart = newFloor;
 	
 	return mainModel;
 end
@@ -180,6 +192,7 @@ function B.build (grid, settings)
 	-- Create the parts
 	local wallPart  = B._wall (settings);
 	local floorPart = B._floor (settings);
+	local floorDetector = B._floorDetector (settings);
 	local deadendMdl = B._deadend (floorPart, settings);
 	local mazeSpawn  = B._spawn (settings);
 	local exitWedge  = B._exit (settings);
@@ -192,12 +205,15 @@ function B.build (grid, settings)
 	local builder = setmetatable ({
 		_grid  = grid,
 		
+		_isRoof = settings.isRoof,
+		
 		_parts = {
 			wall = wallPart,
 			floor = floorPart,
 			deadEnd = deadendMdl,
 			start = mazeSpawn,
-			exit = exitWedge
+			exit = exitWedge,
+			detector = floorDetector
 		},
 		
 		_size   = settings.SpaceSize,
@@ -235,7 +251,7 @@ function Builder:_place (row, column)
 	local offset = self:_calculateOffset (part)
 	
 	local newPart = part:Clone ();
-	reposition(newPart, pos, offset);
+	reposition(newPart, pos + offset);
 	newPart.Parent = self._parent;
 	
 	if (spaceType == SpaceType.End) then
@@ -257,6 +273,18 @@ function Builder:_partType (row, column)
 	
 	if (result == nil) then
 		return error ("Could not find part type for SpaceType: " .. tostring(spaceType));
+	end
+	
+	-- Special case - The roof should only have floors
+	if (self._isRoof) then
+		-- No walls, just floors
+		if (result) then
+			return self._parts.floor, SpaceType.Floor;
+		end
+		
+		-- The opening should be covered by a FloorDetector --
+		-- That is, it'll fire off when a player exits the maze
+		return self._parts.detector, SpaceType.floor;
 	end
 	
 	return result, spaceType;

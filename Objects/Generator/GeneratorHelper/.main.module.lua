@@ -35,33 +35,58 @@ local directions = {Direction.Up, Direction.Down, Direction.Left, Direction.Righ
       directions = Array.new (directions);
 
 -- ** Constants ** --
-local MIN_EXIT_COLS  = 4;
-local MIN_EXIT_ROWS  = 4;
+local MIN_EXIT_COLS  = 2;
+local MIN_EXIT_ROWS  = 2;
 local MIN_EXIT_SPACE = Space.new (MIN_EXIT_COLS, MIN_EXIT_ROWS);
+
+local MAX_REGEN_COUNT = 10;
 
 -- ** Constructor ** --
 function GH.new (grid)
 	return setmetatable ({
 		_grid = grid,
 		
+		_isRoof = nil,
+		
 		_deadends = Array.new (),
 		
 		_minDeadend = MIN_EXIT_SPACE,
-		_maxDeadend = Space.new (grid:numColumns() - MIN_EXIT_COLS, grid:numRows() - MIN_EXIT_ROWS)
+		_maxDeadend = Space.new (grid:numColumns() - MIN_EXIT_COLS + 1, grid:numRows() - MIN_EXIT_ROWS + 1)
 	}, GenHelper);
 end
 
 -- ** Public Methods ** --
-function GenHelper:generate ()
+function GenHelper:generate (isRoof)
+	self._isRoof = isRoof;
+	
 	local start = self._grid:getStartSpace ();
 	self._start = start;
 	
-	self:_generateRecursive (start);
-	
-	self:_setGridEnd ();
+	self:_regenerate ();
 end
 
 -- ** Private Methods ** --
+function GenHelper:_regenerate (counter)
+	if (not counter) then counter = 0; end
+	assert (counter < MAX_REGEN_COUNT, "Could not create a valid grid.");
+	
+	local start = self._start;
+	
+	local success = pcall (function ()
+		self:_generateRecursive (start);
+		self:_setGridEnd ();
+	end)
+	
+	if (not success) then
+		print ("The failed grid is ", self._grid);
+		print ("Failed to find an exit ... Regenerating");
+		print ("Start space is ", self._start)
+		
+		self._grid:reset ();
+		print ("After resetting: ", self._grid)
+		self:_regenerate (counter + 1);
+	end
+end
 
 -- The recursive generator function
 function GenHelper:_generateRecursive (position)
@@ -134,15 +159,31 @@ end
 function GenHelper:_deadend (position)
 	self:_setSpace (position, SpaceType.Deadend);
 	
-	if (position >= self._minDeadend and position <= self._maxDeadend) then
+	-- only add the position as possible exit if it's within the borders,
+	-- meaning a start space can be placed for the next floor
+	local direction = self._grid:getExitDirection (position)
+	local nextPos   = position + direction;
+	local validCheck = (nextPos >= self._minDeadend and nextPos <= self._maxDeadend);
+	
+	print ("Deadend added at ", position)
+	
+	if (validCheck) then
+		print ("Valid position at ", position)
 		self._deadends:add (position);
 	end
 end
 
 -- End of the grid
 function GenHelper:_setGridEnd ()
+	if (self._isRoof) then
+		self._grid:setEndSpace (Space.new (1, 1))
+		return;
+	end
+	
+	print (self._deadends);
+	
 	local endPos = self._deadends:random ();
-	assert (endPos, " No deadends found. Cannot set the end of the maze ");
+	assert (endPos, "could not find a valid exit");
 	
 	self._grid:setEndSpace (endPos);
 end

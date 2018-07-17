@@ -21,7 +21,15 @@
 				Up    = The exit is in the previous row of the floor;
 				Down  = The exit is in the next row from the floor;
 				nil   = The exit is completely surrounded by walls.
-	
+		reset ()
+			Purpose: Resets the grid, replacing all spaces with walls.
+		setResettable (space : Space, canReset : Boolean)
+			Purpose: Sets whether or not a space will be reset by the reset () method.
+			Arguments:
+				space    Space     The space to set resettable / not resettable
+				canReset  Boolean  Whether or not the space can be set to a wall.
+			Returns: None
+		
 	The following getters:
 		numColumns () : Integer
 		numRows () : Integer
@@ -29,6 +37,7 @@
 		getEndSpace () : Space
 		getSpaceType (position : Space) : SpaceType
 		getSpaceTypeRC (row : Integer, col : Integer) : SpaceType
+		isResettable (space : Space) : Boolean
 		
 	And the following setters:
 		setStartSpace (s : Space)
@@ -55,13 +64,16 @@ function G.new (numRows, numColumns)
 		_numRows    = numRows,
 		_endSpace   = Space.new (),
 		_startSpace = Space.new (),
-		_grid       = { }
+		_grid       = { },
+		
+		_resettable = { }
 	}, Grid);
 end
 
 -- ** Public Methods ** --
-function Grid:getExitDirection ()
-	local exitPosition = self:getEndSpace ();
+-- Determines the direction the player will be moving from the exit
+function Grid:getExitDirection (position)
+	local exitPosition = position or self:getEndSpace ();
 	
 	-- Check each direction individually to find the floor
 	-- Once floor is found, we can return the direction
@@ -76,6 +88,25 @@ function Grid:getExitDirection ()
 	else
 		return nil;
 	end
+end
+
+-- Reset the Grid, returning everything to walls
+function Grid:reset ()
+	local start = self:getStartSpace ();
+	for row = 1,self._numRows do
+		for col = 1,self._numColumns do
+			local space = Space.new (row, col);
+			if (self:isResettable (space)) then
+				self:setSpaceType (space, SpaceType.Wall);
+			end
+		end
+	end
+	self:setSpaceType (start, SpaceType.Floor);
+end
+
+-- Resettable
+function Grid:setResettable (space, canReset)
+	self._resettable [space] = canReset;
 end
 
 -- ** Public Getters ** --
@@ -111,6 +142,10 @@ function Grid:getSpaceType (space)
 	return spaceType or SpaceType.Default;
 end
 
+-- Resettable
+function Grid:isResettable (space)
+	return self._resettable [space] ~= false;
+end
 
 -- ** Public Setters ** --
 -- Set the start, end spaces

@@ -30,7 +30,7 @@ end
 
 -- ** Helper Functions ** --
 function getRotation (direction)
-	return rotations [direction] or error ("Rotation for exit not found");
+	return rotations [direction] or rotations [Direction.Right];
 end
 
 return rotateWedge;

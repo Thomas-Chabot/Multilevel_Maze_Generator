@@ -15,8 +15,8 @@ end
 
 -- Helper Functions
 function positionOf (row, column, spaceSize, offset)
-	local posX = column * spaceSize.X;
-	local posZ = row * spaceSize.Z;
+	local posX = (column - 1) * spaceSize.X;
+	local posZ = (row - 1) * spaceSize.Z;
 	
 	return Vector3.new (posX, 0, posZ) + offset;
 end

@@ -81,6 +81,7 @@ end
 -- Return a random child of the array
 function arrayObj:random ()
 	if (not self.objs or #self.objs == 0) then return nil end
+	
 	return self.objs[math.random(1, #self.objs)];
 end
 

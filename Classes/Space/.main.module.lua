@@ -124,6 +124,9 @@ end
 function Space:__lt (other)
 	return self.X < other.X and self.Y < other.Y;
 end
+function Space:__le (other)
+	return self.X <= other.X and self.Y <= other.Y;
+end
 
 function Space:__tostring ()
 	return "(" .. self._row .. ", " .. self._col .. ")";

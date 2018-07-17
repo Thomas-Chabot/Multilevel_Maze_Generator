@@ -45,6 +45,7 @@ function G.generate (numRows, numColumns, options)
 		_nc = numColumns,
 		
 		_start = options.StartSpace,
+		_isRoof = options.isRoof,
 		
 		_grid = Grid.new (numRows, numColumns),
 		_helper = nil
@@ -73,7 +74,12 @@ function Generator:_initStartSpace (isBottom, direction)
 	local startSpace = self:_generateStartSpace ();
 	
 	if (isBottom == false) then
-		-- Note to self: This won't work if the exit is ever at the border
+		-- Make sure that in case the grid has to be reset,
+		-- The two start spaces won't be altered
+		self._grid:setResettable (startSpace, false);
+		self._grid:setResettable (startSpace + direction, false);		
+		
+		-- Now set up the start
 		self._grid:setSpaceType (startSpace, SpaceType.None);
 		self._grid:setSpaceType (startSpace + direction, SpaceType.Floor);
 		startSpace = startSpace + direction + direction;
@@ -109,7 +115,7 @@ end
 
 -- Main generator
 function Generator:_generate ()
-	self._helper:generate ();
+	self._helper:generate (self._isRoof);
 end
 
 Generator.__index = Generator;
